@@ -17,7 +17,7 @@ from typing import Callable
 from dinosaur import typing
 import jax
 import jax.numpy as jnp
-import metrics_util
+import neuralgcm.reference_code.metrics_util as metrics_util
 
 
 Pytree = typing.Pytree

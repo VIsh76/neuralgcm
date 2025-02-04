@@ -205,6 +205,7 @@ class CustomCoordsStep(BaseStep, hk.Module):
     return self.from_custom_coords_fn(custom_out)
 
 
+
 @gin.register
 class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
   """Step module that uses stochastic physics tendencies with dycore."""
@@ -239,6 +240,8 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
         coords, inner_dt, physics_specs, aux_features)
     self.checkpoint_substep = checkpoint_substep
     self.coords = coords
+    print("Checkpoint Substep :", checkpoint_substep)
+
 
   def finalize_state(
       self,

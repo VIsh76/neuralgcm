@@ -422,6 +422,7 @@ class PressureLevelModel:
     f = self._structure.forcing_fn(self.params, None, forcings, sim_time)
     return self._structure.encode_fn(self.params, rng_key, inputs, f)
 
+  @jax.checkpoint
   @jax.jit
   @_static_gin_config
   def advance(self, state: State, forcings: Forcings) -> State:
@@ -543,7 +544,16 @@ class PressureLevelModel:
       return wrapped
 
     if post_process_fn is None:
-      post_process_fn = self.decode
+       post_process_fn = self.decode
+    elif post_process_fn=='full':
+       def post_process_fn(state, forcings):   
+          output = self.decode(state, forcings)
+          return {"model_nodal":  self.model_coords.horizontal.to_nodal(   pytree_utils.as_dict(state.state)[0]),
+            "model_modal": pytree_utils.as_dict(state.state)[0],
+            "data_nodal": output,
+            "data_modal": self.data_coords.horizontal.to_modal(output)
+        }
+       post_process_fn = post_process_fn
 
     inner_steps = _calculate_sub_steps(self.timestep, timedelta)
     trajectory_func = time_integration.trajectory_from_step(

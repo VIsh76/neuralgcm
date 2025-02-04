@@ -30,11 +30,10 @@ import jax.numpy as jnp
 from neuralgcm import model_utils
 import numpy as np
 
-import train_utils
-import linear_transforms
-import metrics_base
-import metrics_util
-
+import neuralgcm.reference_code.train_utils as train_utils
+import neuralgcm.reference_code.linear_transforms as linear_transforms
+import neuralgcm.reference_code.metrics_base as metrics_base
+import neuralgcm.reference_code.metrics_util as metrics_util
 
 Pytree = typing.Pytree
 TrajectoryRepresentations = typing.TrajectoryRepresentations

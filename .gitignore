@@ -6,3 +6,5 @@ docs/.ipynb_checkpoints
 docs/_build
 docs/_autosummary
 __pycache__
+
+*.ipynb_checkpoints/

@@ -299,15 +299,15 @@ def _pmean_all_axes_batch(args, batch_axes):
   return _pmean_all_axes_p.bind(y), batch_axis
 
 
-_pmean_all_axes_p = jex.core.Primitive('pmean_all_axes')
-_pmean_all_axes_p.def_impl(_pmean_all_axes_impl)
-_pmean_all_axes_p.def_abstract_eval(_pmean_all_axes_impl)
-batching.primitive_batchers[_pmean_all_axes_p] = _pmean_all_axes_batch
-ad.deflinear(_pmean_all_axes_p, lambda cotangent: [pmean_all_axes(cotangent)])
-mlir.register_lowering(
-    _pmean_all_axes_p,
-    mlir.lower_fun(_pmean_all_axes_impl, multiple_results=False),
-)
+#_pmean_all_axes_p = jex.core.Primitive('pmean_all_axes')
+#_pmean_all_axes_p.def_impl(_pmean_all_axes_impl)
+#_pmean_all_axes_p.def_abstract_eval(_pmean_all_axes_impl)
+#batching.primitive_batchers[_pmean_all_axes_p] = _pmean_all_axes_batch
+#ad.deflinear(_pmean_all_axes_p, lambda cotangent: [pmean_all_axes(cotangent)])
+#mlir.register_lowering(
+#    _pmean_all_axes_p,
+#    mlir.lower_fun(_pmean_all_axes_impl, multiple_results=False),
+#)
 
 
 @dataclasses.dataclass

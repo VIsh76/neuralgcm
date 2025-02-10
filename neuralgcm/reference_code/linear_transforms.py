@@ -26,8 +26,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-import metrics_util
-
+import neuralgcm.reference_code.metrics_util as metrics_util
 
 Pytree = typing.Pytree
 TrajectoryRepresentations = typing.TrajectoryRepresentations

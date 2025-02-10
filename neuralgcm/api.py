@@ -24,6 +24,8 @@ from dinosaur import scales
 from dinosaur import time_integration
 from dinosaur import typing
 from dinosaur import xarray_utils
+from dinosaur import pytree_utils
+
 import jax
 from jax import tree_util
 import jax.numpy as jnp
@@ -390,6 +392,7 @@ class PressureLevelModel:
         forcings[k] = forcings[k].squeeze(axis=-3)
     return forcings
 
+  @jax.checkpoint
   @jax.jit
   @_static_gin_config
   def encode(
@@ -447,6 +450,7 @@ class PressureLevelModel:
     state = self._structure.advance_fn(self.params, None, state, f)
     return state
 
+  @jax.checkpoint
   @jax.jit
   @_static_gin_config
   def decode(self, state: State, forcings: Forcings) -> Outputs:

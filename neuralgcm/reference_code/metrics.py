@@ -93,14 +93,22 @@ class TransformedL2Loss(metrics_base.Loss):
       prediction: TrajectoryRepresentations,
       target: TrajectoryRepresentations,
   ) -> Pytree:
+    transformed_errors = self.evaluate_transform(prediction, target)
+    squared_transformed_errors = tree_map(jnp.square, transformed_errors)
+    return self.mean_per_variable(squared_transformed_errors)
+
+  def evaluate_transform(
+      self,
+      prediction: TrajectoryRepresentations,
+      target: TrajectoryRepresentations,
+  ) -> Pytree:
     prediction = self.get_representation(prediction)
     target = self.get_representation(target)
     trajectory = self.getter(prediction)
     target = self.getter(target)
     errors = tree_map(jnp.subtract, trajectory, target)
     transformed_errors = self.transform(errors, target)
-    squared_transformed_errors = tree_map(jnp.square, transformed_errors)
-    return self.mean_per_variable(squared_transformed_errors)
+    return transformed_errors
 
 
 @gin.register
@@ -154,14 +162,22 @@ class TransformedL2SpectrumLoss(metrics_base.Loss):
       prediction: TrajectoryRepresentations,
       target: TrajectoryRepresentations,
   ) -> Pytree:
+    transformed_errors = self.evaluate_transform(prediction, target)
+    squared_transformed_errors = tree_map(jnp.square, transformed_errors)
+    return self.mean_per_variable(squared_transformed_errors)
+
+  def evaluate_transform(
+      self,
+      prediction: TrajectoryRepresentations,
+      target: TrajectoryRepresentations,
+  ) -> Pytree:
     prediction = self.get_representation(prediction)
     target = self.get_representation(target)
     trajectory_spectrum = self.spectrum_fn(self.getter(prediction))
     target_spectrum = self.spectrum_fn(self.getter(target))
     errors = tree_map(jnp.subtract, trajectory_spectrum, target_spectrum)
     transformed_errors = self.transform(errors, target)
-    squared_transformed_errors = tree_map(jnp.square, transformed_errors)
-    return self.mean_per_variable(squared_transformed_errors)
+    return transformed_errors
 
 
 @gin.register

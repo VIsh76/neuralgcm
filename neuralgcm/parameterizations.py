@@ -30,7 +30,14 @@ MappingModule = mappings.MappingModule
 StepFilterModule = Callable[..., typing.PyTreeStepFilterFn]
 TransformModule = typing.TransformModule
 
-
+#DEBUG:
+import jax
+def check_nan(op_name, tree):
+  jax.debug.print(f"par. {op_name} " + "l1_mean=\t {x}", x=jax.tree.map(lambda x:abs(x).mean(), tree))
+  jax.debug.print(f"par. {op_name} " + "max=\t {x}", x=jax.tree.map(lambda x:x.max(), tree))
+  jax.debug.print(f"par. {op_name} " + "min=\t {x}", x=jax.tree.map(lambda x:x.min(), tree))
+  
+  
 @gin.register
 class DirectNeuralParameterization(hk.Module):
   """Computes modal physics tendencies from the input state and forcing."""
@@ -156,16 +163,24 @@ class DivCurlNeuralParameterization(hk.Module):
     prediction_shapes['u'] = prediction_shapes.pop('divergence')
     prediction_shapes['v'] = prediction_shapes.pop('vorticity')
     net = self.nodal_mapping_module(prediction_shapes)
+    check_nan('input', inputs) # Check type of nodal mapping
     nodal_inputs = self.modal_to_nodal_features_fn(
         inputs, memory=memory, diagnostics=diagnostics, randomness=randomness,
         forcing=forcing,
     )
+    check_nan('after feature fn', nodal_inputs)
     nodal_inputs = self.coords.dycore_to_physics_sharding(nodal_inputs)
+    check_nan('before net', nodal_inputs)
     nodal_tendencies = net(nodal_inputs)
-    nodal_tendencies = self.coords.physics_to_dycore_sharding(nodal_tendencies)
+    check_nan('after net', nodal_tendencies)
+    nodal_tendencies = self.coords.physics_to_dycore_sharding(nodal_tendencies)    
     nodal_tendencies = self.tendency_transform_fn(nodal_tendencies)
+    check_nan('after tendency transform', nodal_tendencies)
+#    check_nan('after transform', nodal_tendencies)
     modal_tendencies = self.to_div_curl_fn(nodal_tendencies)
+#    check_nan('after divcurl', nodal_tendencies)
     modal_tendencies = self.filter_fn(inputs, modal_tendencies)
+#    check_nan('after filter', nodal_tendencies)
     outputs = from_dict_fn(modal_tendencies)
     outputs = self.coords.with_dycore_sharding(outputs)
     return outputs

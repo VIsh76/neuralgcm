@@ -705,6 +705,10 @@ class DimensionalWeatherbenchToPrimitiveEncoder(WeatherbenchToPrimitiveEncoder):
         transform_module=transform_module,
         name=name,
     )
+    
+
+
+
     self.nondim_transform_fn = transforms.NondimensionalizeTransform(
         coords,
         dt,
@@ -856,7 +860,7 @@ class DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder(hk.Module):
     )
 
     self.nondim_transform_fn = transforms.NondimensionalizeTransform(
-        coords, dt, physics_specs, aux_features, nondim_input_coords,
+        coords, dt, physics_specs, aux_features, None,
         inputs_to_units_mapping=inputs_to_units_mapping)
 
   def __call__(
@@ -864,6 +868,7 @@ class DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder(hk.Module):
       inputs: DataState,
       forcing: Forcing,
   ) -> ModelState:
+    print(inputs.keys())
     nondim_inputs = self.nondim_transform_fn(inputs)
     memory = self.memory_encoder(nondim_inputs, forcing=forcing)
     model_state = self.state_encoder(nondim_inputs, forcing=forcing)

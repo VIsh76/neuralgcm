@@ -267,6 +267,7 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
     x.randomness = self.randomness_fn.unconditional_sample(
         hk.maybe_next_rng_key()
     )
+    print(x.state, x.memory, x.diagnostics)
     pp_tendency = self.physics_parameterization_fn(
         x.state, x.memory, x.diagnostics, x.randomness.nodal_value, forcing
     )
@@ -280,13 +281,15 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
   ) -> ModelState:
     """Computes the state of the system evolved in time by `dt`."""
 
+
+    
     def step_fn(x):
       x = self.coords.with_dycore_sharding(x)
       # TODO(dkochkov) Consider passing `x` to physics_parameterization.
       pp_tendency = self.physics_parameterization_fn(
           x.state, x.memory, x.diagnostics, x.randomness.nodal_value, forcing
       )
-
+      #FLAG THIS IS WHERE THE NN COMPUTE THE VALUE!
       pp_tendency = self.perturbation_fn(
           pp_tendency,
           state=x.state,

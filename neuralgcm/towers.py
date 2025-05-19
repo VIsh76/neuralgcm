@@ -109,15 +109,19 @@ class VerticalConvTower(hk.Module):
   def net(self, inputs: Array) -> Array:
     out = inputs
     num_layers = len(self.layers)
+    print("CONVOLUTION SHAPE", out.shape)
+    check_nan(f'conv12d input', out)
     for i, layer in enumerate(self.layers):
       out = layer(out)
       if i < (num_layers - 1) or self.activate_final:
         out = self.activation(out)
+    check_nan(f'conv12d {i}', out)
     return out
 
   def __call__(self, inputs: Array) -> Array:
     vmap_last = lambda fn: hk.vmap(fn, in_axes=-1, out_axes=-1, split_rng=False)
     tower_fn = vmap_last(vmap_last(self.net))
+    check_nan(f'full conv12d input', inputs)
     if self.checkpoint_tower:
       tower_fn = hk.remat(tower_fn)
     return tower_fn(inputs)
@@ -192,15 +196,39 @@ class EpdTower(hk.Module):
 
   def __call__(self, inputs: Array) -> Array:
     """Applies EPD tower to inputs."""
+    print('input_shape', inputs.shape)
     encoded = self.encode_tower_factory(self.latent_size)(inputs)
     if self.post_encode_activation is not None:
       encoded = self.post_encode_activation(encoded)
+    check_nan("encoded act", encoded)
     current = encoded
     for _ in range(self.num_process_blocks):
       current = current + self.process_tower_factory(self.latent_size)(current)
     if self.pre_decode_activation is not None:
       current = self.pre_decode_activation(current)
+    check_nan("after process", current)
     out = self.decode_tower_factory(self.output_size)(current)
     if self.final_activation is not None:
       return self.final_activation(out)
+    check_nan("after decode", out)
     return out
+
+import jax
+def check_nan(op_name, arr):
+  if len(arr.shape) ==3:
+#      jax.debug.print(f"tow. {op_name} " + "shape={b}", b=arr.shape)
+      jax.debug.print(f"tow. {op_name} " + "mean=\t {x}", x=arr.mean(axis=(-1,-2)))
+      jax.debug.print(f"tow. {op_name} " + "max=\t {x}", x=arr.max(axis=(-1,-2)))
+      jax.debug.print(f"tow. {op_name} " + "min=\t {x}", x=arr.min(axis=(-1,-2)))
+  elif len(arr.shape) ==4:
+#      jax.debug.print(f"tow. {op_name} " + "shape={b}", b=arr.shape)
+      jax.debug.print(f"tow. {op_name} " + "mean=\t {x}", x=arr.mean(axis=(-1,-2, -3)))
+      jax.debug.print(f"tow. {op_name} " + "max=\t {x}", x=arr.max(axis=(-1,-2, -3)))
+      jax.debug.print(f"tow. {op_name} " + "min=\t {x}", x=arr.min(axis=(-1,-2, -3)))
+  elif len(arr.shape) ==2:
+#      jax.debug.print(f"tow. {op_name} " + "shape={b}", b=arr.shape)
+      jax.debug.print(f"tow. {op_name} " + "mean=\t {x}", x=arr.mean(axis=(-1)))
+      jax.debug.print(f"tow. {op_name} " + "max=\t {x}", x=arr.max(axis=(-1)))
+      jax.debug.print(f"tow. {op_name} " + "min=\t {x}", x=arr.min(axis=(-1)))
+  else:
+    print("error", len(arr.shape))

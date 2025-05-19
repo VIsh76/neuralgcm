@@ -35,6 +35,11 @@ Pytree = typing.Pytree
 TransformModule = typing.TransformModule
 KeyWithCosLatFactor = typing.KeyWithCosLatFactor
 
+import jax
+def check_nan(op_name, tree):
+  jax.debug.print(f"fea. {op_name} " + "l1_mean=\t {x}", x=jax.tree.map(lambda x:abs(x).mean(), tree))
+  jax.debug.print(f"fea. {op_name} " + "max=\t {x}", x=jax.tree.map(lambda x:x.max(), tree))
+  jax.debug.print(f"fea. {op_name} " + "min=\t {x}", x=jax.tree.map(lambda x:x.min(), tree))
 
 class FeaturesFn(Protocol):
 
@@ -768,10 +773,12 @@ class CombinedFeatures(hk.Module):
       if type(feature_fn).__name__ not in self.feature_module_names_to_exclude:
         features = feature_fn(inputs, memory, diagnostics, randomness, forcing)
         for k, v in features.items():
+          check_nan(k, v)
           if k in all_features:
             raise ValueError(f'Encountered duplicate feature {k}')
           all_features[k] = v
-    all_features = self.features_transform_fn(all_features)
+    all_features = self.features_transform_fn(all_features)  #RESCALES PROBABLY
+#    check_nan('all features', all_features)  #same as checking for all features
     for k in self.features_to_exclude:
       all_features.pop(k, None)
     return all_features

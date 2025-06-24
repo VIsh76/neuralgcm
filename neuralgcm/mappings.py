@@ -205,3 +205,66 @@ class ParallelMapping(hk.Module):
   def __call__(self, inputs: typing.Pytree) -> typing.Pytree:
     results = [mapping_fn(inputs) for mapping_fn in self.mapping_fns]
     return jax.tree_util.tree_map(lambda *args: sum(args), *results)
+
+
+
+##### UNET:
+@gin.register(denylist=['output_shapes'])
+class UnetNodalVolumeMapping(hk.Module):
+  """Maps the pytree of nodal volume features to a pytree of given structure.
+
+  This module stacks the input pytree into an array of shape
+  (channel, level, lon, lat), passes it to a NN tower.  The output from the NN
+  is expected to have shape (n, level, lon, lat), and gets unpacked to a pytree
+  with the structure of output_shapes, e.g.
+    output_shapes = {
+        'var_1': jnp.asarray((level, lon, lat)),
+        'var_2': jnp.asarray((level, lon, lat)),
+        ...,
+        'var_n': jnp.asarray((level, lon, lat)),
+    }
+
+  The leaves of the input pytree must have the same shape, e.g. (1, lon, lat) or
+  (level, lon, lat). To mix shapes, broadcast before passing to the mapping.
+  """
+
+  def __init__(
+      self,
+      output_shapes: typing.Pytree,
+      tower_factory: Tower = gin.REQUIRED, #UNET
+      levels: int = gin.REQUIRED,
+      name: Optional[str] = None
+  ):
+    super().__init__(name=name)
+    feature_axis = 0
+    output_size = len(jax.tree_util.tree_leaves(output_shapes))
+
+    # tower preserves the last two spatial dimensions.
+
+    self.tower = tower_factory(output_size)
+    self.output_shapes = output_shapes
+    self.feature_axis = feature_axis
+    self.levels = levels
+
+  def __call__(self, inputs: typing.Pytree) -> typing.Pytree:    
+    def get_3d(inputs):
+      return  pytree_utils.stack_pytree({k:inputs[k] for k in inputs if inputs[k].shape[0] == self.levels}, axis=self.feature_axis)
+  
+    def get_2d(inputs):
+      leaves, _ = jax.tree.flatten({k:jax.numpy.expand_dims(inputs[k],0) for k in inputs if inputs[k].shape[0] != self.levels})  
+      array_2d = jax.numpy.concatenate(leaves, axis=1)
+      return array_2d
+    
+    array_2d = get_2d(inputs)
+    array_3d = get_3d(inputs)
+    
+    if array_3d.ndim != 4:
+      raise ValueError(f'Expected input array with ndim=4, got {array_3d.shape=}')
+    if array_2d.ndim != 4:
+      raise ValueError(f'Expected input array with ndim=4, got {array_3d.shape=}')
+    outputs = self.tower(array_3d, array_2d)
+    if outputs.ndim != 4:
+      raise ValueError(f'Expected outputs with ndim=4, got {outputs.shape=}')
+    return pytree_utils.unstack_to_pytree(
+        outputs, self.output_shapes, axis=self.feature_axis
+    )

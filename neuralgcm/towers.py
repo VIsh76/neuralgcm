@@ -204,3 +204,92 @@ class EpdTower(hk.Module):
     if self.final_activation is not None:
       return self.final_activation(out)
     return out
+
+
+#### UNET:
+class ConvBlockUnet(hk.Module):
+    def __init__(self, out_channels: int, activation: Callable, kernel_size:int, name=None):
+        super().__init__(name=name)
+        self.out_channels = out_channels
+        self.activation = activation
+        self.kernel_size = kernel_size
+
+    def __call__(self, x):
+        x = hk.Conv1D(self.out_channels, kernel_shape=self.kernel_size, padding="SAME", data_format='NCW')(x)
+        x = self.activation(x)
+        x = hk.Conv1D(self.out_channels, kernel_shape=self.kernel_size, padding="SAME", data_format='NCW')(x)
+        x = self.activation(x)
+        return x
+        
+class ConvBlockUnet(hk.Module):
+    def __init__(self, out_channels: int, activation: Callable, kernel_size:int, name=None):
+        super().__init__(name=name)
+        self.out_channels = out_channels
+        self.activation = activation
+        self.kernel_size = kernel_size
+
+    def __call__(self, x):
+        x = hk.Conv1D(self.out_channels, kernel_shape=self.kernel_size, padding="SAME", data_format='NCW')(x)
+        x = self.activation(x)
+        x = hk.Conv1D(self.out_channels, kernel_shape=self.kernel_size, padding="SAME", data_format='NCW')(x)
+        x = self.activation(x)
+        return x
+
+
+@gin.register(denylist=['output_size'])
+class UNet1D2(hk.Module):
+    def __init__(self, output_size, num_blocks, activation, kernel_size, levels, latent_size=None, 
+                 checkpoint_tower = False,
+                 final_activation: Optional[Callable[[jnp.ndarray], jnp.ndarray]] = None,
+                 name=None):
+        super().__init__(name=name)
+        self.output_size = output_size
+        self.num_blocks = num_blocks
+        self.activation = activation
+        self.kernel_size = kernel_size
+        self.latent_size = latent_size
+        self.levels = levels
+        self.final_activation = final_activation
+        self.name = name
+        self.checkpoint_tower = checkpoint_tower
+
+        #if self.levels % 2**num_blocks != 0:
+        #    raise ValueError(f'levels must be divided by 2**num_bloc, got {self.levels=}, {2**num_blocks=}')
+    
+    def net(self, column_data: jnp.ndarray, surface_data:jnp.ndarray) -> jnp.ndarray:   
+        x = column_data  # (C, L)
+        x = x[None, ...]  # add batch: (1, C, L)         
+
+        downs = []
+        for i in range(self.num_blocks):
+            x = ConvBlockUnet(self.latent_size, self.activation, self.kernel_size)(x)
+            downs.append(x)
+            x = hk.max_pool(x, window_shape=2, strides=2, padding="SAME", channel_axis=1)
+
+        # Bottleneck: inject surface data
+        surface = surface_data[:, :, None]  # (1, 1, F)
+        surface_bd = jnp.broadcast_to(surface, (x.shape[0],  surface.shape[1], x.shape[-1])) 
+
+        x = jnp.concatenate([x, surface_bd], axis=1)
+        for i in reversed(range(self.num_blocks)):
+            x = hk.Conv1DTranspose(self.latent_size, kernel_shape=2, stride=2, padding="SAME", data_format='NCW')(x)
+            skip = downs[i]
+            # Pad or crop if needed to match shapes
+            if skip.shape[-1] != x.shape[-1]:
+                min_len = min(skip.shape[-1], x.shape[-1])
+                skip = skip[..., :min_len]
+                x = x[..., :min_len]
+            x = jnp.concatenate([x, skip], axis=1)
+            x = ConvBlockUnet(self.latent_size, self.activation, self.kernel_size)(x)
+
+        x = hk.Conv1D(self.output_size, kernel_shape=self.kernel_size, data_format='NCW')(x)
+        return x[0]  # remove batch
+
+    def __call__(self, inputs: Array, surface: Array) -> Array:
+      # TEST:    
+      vmap_last = lambda fn: hk.vmap(fn, in_axes=(-1, -1), out_axes=-1, split_rng=False)
+      tower_fn = vmap_last(vmap_last(self.net))
+      if self.checkpoint_tower:
+        tower_fn = hk.remat(tower_fn)
+      output = tower_fn(inputs, surface)
+      return output
